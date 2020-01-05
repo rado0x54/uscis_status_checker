@@ -37,10 +37,10 @@ def check_status(number):
         logging.info('Receipt number {} not found at USCIS or website down.'.format(number))
         return 'Case not found', 'Seems like USCIS does not have a case for receipt number {}'.format(number)
 
-    status_text = status_elements[0].text
+    status_text = status_elements[0].text_content()
 
     info_element = html_document.xpath(XPATH_DESCRIPTION)
-    info_text = info_element[0].text if len(info_element) == 1 else 'No detailed description of status'
+    info_text = info_element[0].text_content() if len(info_element) == 1 else 'No detailed description of status'
 
     return status_text, info_text
 
