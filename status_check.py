@@ -4,10 +4,12 @@ import re
 import argparse
 import csv
 
+import requests
+from lxml import html
 import telegram
 
 import logging
-from requests_html import HTMLSession
+
 from datetime import datetime, timezone
 
 logging.basicConfig(
@@ -25,17 +27,22 @@ USCIS_CASE_PATTERN = re.compile("^[A-Z]{3}\d{10}$")
 
 def check_status(number):
     payload = {'initCaseSearch': 'CHECK STATUS', 'appReceiptNum': number}
-    with HTMLSession() as s:
-        r = s.post(URL, headers=HEADER, data=payload)
-        status = r.html.xpath(XPATH_STATUS, first=True)
-        if status is None:
-            logging.info('Receipt number {} not found at USCIS or website down.'.format(number))
-            return 'Case not found', 'Seems like USCIS does not have a case for receipt number {}'.format(number)
 
-        info = r.html.xpath(XPATH_DESCRIPTION, first=True)
-        info_text = info.full_text if info is not None else 'No detailed description of status'
+    response = requests.post(URL, headers=HEADER, data=payload)
+    html_document = html.fromstring(response.content)
 
-    return status.full_text, info_text
+    status_elements = html_document.xpath(XPATH_STATUS)
+
+    if len(status_elements) != 1:
+        logging.info('Receipt number {} not found at USCIS or website down.'.format(number))
+        return 'Case not found', 'Seems like USCIS does not have a case for receipt number {}'.format(number)
+
+    status_text = status_elements[0].text
+
+    info_element = html_document.xpath(XPATH_DESCRIPTION)
+    info_text = info_element[0].text if len(info_element) == 1 else 'No detailed description of status'
+
+    return status_text, info_text
 
 
 def send_notifications(telegram_bot_api_token, telegram_chat_id, contents):
@@ -127,6 +134,7 @@ def query_receipts(receipts, cached_cases):
 
 if __name__ == '__main__':
     args = parse_arguments()
+    cached_cases = {}
 
     # read
     if args.file is not None:

@@ -1,2 +1,3 @@
-requests-html
+requests
+lxml
 python-telegram-bot
